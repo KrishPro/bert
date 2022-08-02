@@ -60,15 +60,22 @@ def process_text(text: str):
         return None
 
 
-def main(data_path: str, output_path: str,):
+def main(data_path: str, output_path: str):
+
     with open(output_path, 'w') as output_file:
 
         input_file = open(data_path)
 
+        num_sentences = 0
         for sentence in tqdm(input_file):
             sentence = process_text(sentence)
             if sentence:
                 output_file.write(sentence)
+                num_sentences += 1
+
+    # Adding the information about the number of sentences to the file name
+    output_dir, output_name, output_ext = os.path.dirname(output_path), *os.path.splitext(os.path.basename(output_path))
+    os.rename(os.path.join(output_dir, output_name+output_ext), os.path.join(output_dir, output_name+f'-{num_sentences}'+output_ext))
 
 
 if __name__ == "__main__":
