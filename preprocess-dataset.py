@@ -4,9 +4,22 @@ Written by KrishPro @ KP
 filename: `preprocess_dataset.py` 
 """
 
+from typing import Set
 from tqdm import tqdm
+import string
 import emoji
+import nltk
 import os
+import re
+
+
+class ExtractEnglish:
+    extract_word = lambda txt: re.sub(r'[\s0-9]', '', txt).translate(str.maketrans('', '', string.punctuation)).lower().strip()
+    ENGLISH_WORDS: Set[str] = set(nltk.corpus.words.words())
+    
+    @staticmethod
+    def extract_english(text: str):
+        return ' '.join([word for word in text.split(' ') if ExtractEnglish.extract_word(word) in ExtractEnglish.ENGLISH_WORDS])
 
 
 def merge_into_one(data_dir: str, output_path: str):
@@ -38,7 +51,8 @@ def process_text(text: str):
         text = emoji.demojize(text)
 
         # NOTE: Modify this file to filter everything except text in the language you want
-
+        # For Example- THe below line filters out everything non-english
+        # text = ExtractEnglish.extract_english(text)
 
         return text
     
