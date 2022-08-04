@@ -4,6 +4,7 @@ Written by KrishPro @ KP
 filename: `preprocess_dataset.py` 
 """
 
+import random
 from typing import Set
 from tqdm import tqdm
 import string
@@ -60,18 +61,23 @@ def process_text(text: str):
         return None
 
 
-def main(data_path: str, output_path: str):
+def main(data_path: str, output_path: str, chunk_size: int = 20_000):
 
     with open(output_path, 'w') as output_file:
 
         input_file = open(data_path)
 
+        chunk = []
         num_sentences = 0
         for sentence in tqdm(input_file):
             sentence = process_text(sentence)
             if sentence:
-                output_file.write(sentence)
-                num_sentences += 1
+                chunk.append(sentence)
+                if len(chunk) == chunk_size:
+                    random.shuffle(chunk)
+                    output_file.write(''.join(chunk))
+                    num_sentences += len(chunk)
+                    chunk = []
 
     # Adding the information about the number of sentences to the file name
     output_dir, output_name, output_ext = os.path.dirname(output_path), *os.path.splitext(os.path.basename(output_path))
