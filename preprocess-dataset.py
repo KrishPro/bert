@@ -63,20 +63,45 @@ def process_text(text: str):
 
 def main(data_path: str, output_path: str, chunk_size: int = 20_000):
 
+    # Opening the output file, it will be opened through out the process. We'll be writting sentences as we want
     with open(output_path, 'w') as output_file:
 
+        # Opening the input file, we'll be looping over it's sentences
         input_file = open(data_path)
 
+        # Creating a blank chunk
         chunk = []
+
+        # Creating a sentence counter
         num_sentences = 0
+
+        # Looping over each sentence of the input file
         for sentence in tqdm(input_file):
+
+            # Processing the sentence
+            # NOTE: If the sentence is not valid, the below function will return None
             sentence = process_text(sentence)
+
+            # If the sentence is valid
             if sentence:
+
+                # Appening the sentence to the chunk
                 chunk.append(sentence)
+
+                # If the chunk_size has reached a pre-setted size, we'll shuffle it and write it on the output_file
                 if len(chunk) == chunk_size:
+
+                    # Shuffling the chunk
                     random.shuffle(chunk)
+
+                    # Joining all the sentences of the chunk
+                    # NOTE: All the sentences end with a new_line, so we can just join them using a blank str
                     output_file.write(''.join(chunk))
+
+                    # Increasing the sentence count by the chunk size
                     num_sentences += len(chunk)
+
+                    # Resetting the chunk
                     chunk = []
 
     # Adding the information about the number of sentences to the file name
