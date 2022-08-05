@@ -5,12 +5,15 @@ filename: `data.py`
 """
 
 import random
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import torch
+import pytorch_lightning as pl
 from torch.nn.utils.rnn import pad_sequence
 import torch.utils.data as data
 from tokenizers import Encoding, Tokenizer
 import os
+
+from tqdm import tqdm
 
 class Dataset(data.Dataset):
     def __init__(self, data_path: str, vocab_path: str, chunk_size: int = 2 ** 10):
@@ -146,3 +149,50 @@ class Dataset(data.Dataset):
         # Returning the length, extracted from the filename
         return self.length
         
+
+class DataModule(pl.LightningDataModule):
+    def __init__(self, data_dir: str, vocab_path: str, batch_size: int, use_workers: bool, pin_memory: bool, chunk_size: int = 2 ** 23):
+        # Storing the parameters we've got
+        self.data_dir = data_dir
+
+        self.dataset_kwargs = {'vocab_path': vocab_path, 'chunk_size': chunk_size}
+        self._hparams = {'batch_size': batch_size, 'use_workers': use_workers, 'pin_memory': pin_memory, 'shuffle': False}
+
+    def setup(self, stage: Optional[str] = None) -> None:
+         # Assign train/val datasets for use in dataloaders
+        if stage == "fit" or stage is None:
+
+            test_path, train_path = [os.path.join(self.data_dir, path) for path in sorted(os.listdir(self.data_dir)) if path.startswith('train') or path.startswith('test')]
+
+            self.train_dataset = Dataset(train_path, **self.dataset_kwargs)
+            self.val_dataset = Dataset(test_path, **self.dataset_kwargs)
+
+    @staticmethod
+    def train_test_split(input_path: str, output_dir: str, val_ratio: float = 0.01):
+        """
+        This function will perform a train-test split
+        """
+        num_sentences = int(os.path.splitext(os.path.basename(input_path))[0].split('-')[-1])
+        val_size = int(num_sentences * val_ratio)
+        file = open(input_path)
+
+        train_file_path, test_file_path = os.path.join(output_dir, f'train-{num_sentences-val_size}.txt'), os.path.join(output_dir, f'test-{val_size}.txt')
+
+        with open(train_file_path, 'w') as train_file, open(test_file_path, 'w') as test_file:
+            for i, sentence in enumerate(tqdm(file, total=num_sentences)):
+                if i < val_size:
+                    test_file.write(sentence)
+                else:
+                    train_file.write(sentence)
+
+        file.close()
+
+    def train_dataloader(self) -> None:
+        return data.DataLoader(self.train_dataset, batch_size=self._hparams['batch_size'], shuffle=self._hparams['shuffle'],
+        pin_memory=self._hparams['pin_memory'], num_workers=os.cpu_count() if self._hparams['use_workers'] else 0, 
+        collate_fn=Dataset.collate_fn)
+
+    def val_dataloader(self) -> None:
+        return data.DataLoader(self.val_dataset, batch_size=self._hparams['batch_size'], shuffle=False,
+        pin_memory=self._hparams['pin_memory'], num_workers=os.cpu_count() if self._hparams['use_workers'] else 0, 
+        collate_fn=Dataset.collate_fn)
