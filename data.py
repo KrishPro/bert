@@ -17,6 +17,7 @@ from tqdm import tqdm
 
 class Dataset(data.Dataset):
     def __init__(self, data_path: str, vocab_path: str, chunk_size: int = 2 ** 10):
+        super().__init__()
         # Extracting the length from the filename
         self.length = int(os.path.splitext(os.path.basename(data_path))[0].split('-')[-1])
 
@@ -152,6 +153,7 @@ class Dataset(data.Dataset):
 
 class DataModule(pl.LightningDataModule):
     def __init__(self, data_dir: str, vocab_path: str, batch_size: int, use_workers: bool, pin_memory: bool, chunk_size: int = 2 ** 23):
+        super().__init__()
         # Storing the parameters we've got
         self.data_dir = data_dir
 
