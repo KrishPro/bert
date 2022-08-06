@@ -4,6 +4,7 @@ Written by KrishPro @ KP
 filename: `preprocess_dataset.py` 
 """
 
+from multiprocessing import Pool
 import random
 from typing import Set
 from tqdm import tqdm
@@ -63,6 +64,9 @@ def process_text(text: str):
 
 def main(data_path: str, output_path: str, chunk_size: int = 20_000):
 
+    # Creating multiprocessing pool
+    pool = Pool(processes=os.cpu_count())
+
     # Opening the output file, it will be opened through out the process. We'll be writting sentences as we want
     with open(output_path, 'w') as output_file:
 
@@ -78,31 +82,28 @@ def main(data_path: str, output_path: str, chunk_size: int = 20_000):
         # Looping over each sentence of the input file
         for sentence in tqdm(input_file):
 
-            # Processing the sentence
-            # NOTE: If the sentence is not valid, the below function will return None
-            sentence = process_text(sentence)
+            # Appening the sentence to the chunk
+            chunk.append(sentence)
 
-            # If the sentence is valid
-            if sentence:
+            # If the chunk_size has reached a pre-setted size, we'll shuffle it and write it on the output_file
+            if len(chunk) == chunk_size:
 
-                # Appening the sentence to the chunk
-                chunk.append(sentence)
+                # Shuffling the chunk
+                random.shuffle(chunk)
 
-                # If the chunk_size has reached a pre-setted size, we'll shuffle it and write it on the output_file
-                if len(chunk) == chunk_size:
+                # Processing sentences parrelly
+                chunk = pool.map(process_text, chunk)
+                chunk = [s for s in chunk if s] # Filtering None items from the list
 
-                    # Shuffling the chunk
-                    random.shuffle(chunk)
+                # Joining all the sentences of the chunk
+                # NOTE: All the sentences end with a new_line, so we can just join them using a blank str
+                output_file.write(''.join(chunk))
 
-                    # Joining all the sentences of the chunk
-                    # NOTE: All the sentences end with a new_line, so we can just join them using a blank str
-                    output_file.write(''.join(chunk))
+                # Increasing the sentence count by the chunk size
+                num_sentences += len(chunk)
 
-                    # Increasing the sentence count by the chunk size
-                    num_sentences += len(chunk)
-
-                    # Resetting the chunk
-                    chunk = []
+                # Resetting the chunk
+                chunk = []
 
     # Adding the information about the number of sentences to the file name
     output_dir, output_name, output_ext = os.path.dirname(output_path), *os.path.splitext(os.path.basename(output_path))
