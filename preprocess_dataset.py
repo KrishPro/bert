@@ -30,7 +30,7 @@ def merge_into_one(data_dir: str, output_path: str):
     """
     with open(output_path, 'a') as dataset:
 
-        for file_name in enumerate(tqdm(os.listdir(data_dir))):
+        for file_name in tqdm(os.listdir(data_dir)):
             file_path = os.path.join(data_dir, file_name)
 
             with open(file_path, 'r') as file:
