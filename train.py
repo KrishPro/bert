@@ -8,6 +8,7 @@ filename: `train.py`
 import shutil
 
 import os
+import yaml
 import torch
 import torch.nn as nn
 from typing import Tuple
@@ -104,20 +105,27 @@ data_dir: str, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2
 
     trainer.fit(model, datamodule)
 
-    ckpt_dir = os.path.join('lightning_logs', sorted(map(lambda name: (int(name.split('_')[1]), name), os.listdir('lightning_logs')))[-1][1], 'checkpoints')
+    version_dir = os.path.join('lightning_logs', sorted(map(lambda name: (int(name.split('_')[1]), name), os.listdir('lightning_logs')))[-1][1])
+    ckpt_dir = os.path.join(version_dir, 'checkpoints')
     if os.path.exists(ckpt_dir) and os.listdir(ckpt_dir):
         ckpt_path = os.path.join(ckpt_dir, sorted(os.listdir(ckpt_dir))[-1])
 
         lightning_ckpt = torch.load(ckpt_path)
+        if 'hyper_parameters' in lightning_ckpt.keys():
 
-        hparams = lightning_ckpt['hyper_parameters']
-        state_dict = lightning_ckpt['state_dict']
+            hparams = lightning_ckpt['hyper_parameters']
+            state_dict = lightning_ckpt['state_dict'] 
+
+        else:
+            state_dict = lightning_ckpt
+            with open(os.path.join(version_dir, 'hparams.yaml')) as file:
+                hparams = yaml.load(file, Loader=yaml.FullLoader)
 
         state_dict = {k[13:]: v for k, v in state_dict.items() if k.startswith('bert_lm.bert')}
-
         torch.save({'hparams': hparams, 'state_dict': state_dict}, 'output.ckpt')
 
         shutil.rmtree(ckpt_dir)
+    
         
 
 if __name__ == '__main__':
