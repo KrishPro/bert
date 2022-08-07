@@ -4,6 +4,8 @@ Written by KrishPro @ KP
 filename: `model.py`
 """
 
+from typing import _S, Type
+from typing_extensions import Self
 import torch.nn as nn
 import torch
 import math
@@ -41,6 +43,18 @@ class Bert(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout, activation, layer_norm_eps)
         encoder_norm = nn.LayerNorm(d_model, eps=layer_norm_eps)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers, encoder_norm)
+
+    @classmethod
+    def from_checkpoint(cls, checkpoint_path: str):
+        ckpt = torch.load(checkpoint_path)
+
+        hparams = ckpt['hparams']
+        state_dict = ckpt['state_dict']
+
+        model = cls(**hparams)
+        model.load_state_dict(state_dict)
+
+        return model
 
     def forward(self, tokens: torch.Tensor):
         # tokens.shape: (S, N)
