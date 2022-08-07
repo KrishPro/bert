@@ -53,7 +53,7 @@ class Model(pl.LightningModule):
         loss: torch.Tensor = self.criterion(out.reshape(S*N, V), tgt.reshape(S*N))
         loss_value: torch.Tensor = loss.detach()
 
-        if batch_idx % 100 and self.print_logs: print(f"epoch={self.current_epoch} | batch_idx={batch_idx} | loss={loss_value:.5f}")
+        if batch_idx % 100 == 0 and self.print_logs: print(f"epoch={self.current_epoch} | batch_idx={batch_idx} | loss={loss_value:.5f}")
 
         self.log("loss", loss_value, batch_size=N)
         
