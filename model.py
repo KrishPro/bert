@@ -4,8 +4,6 @@ Written by KrishPro @ KP
 filename: `model.py`
 """
 
-from typing import _S, Type
-from typing_extensions import Self
 import torch.nn as nn
 import torch
 import math
