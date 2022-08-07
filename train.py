@@ -26,10 +26,11 @@ except:
 
 class Model(pl.LightningModule):
     def __init__(self, d_model: int, nhead: int, dim_feedforward: int, num_layers: int, vocab_size: int,
-    warmup_steps=4000, dropout=0.1, pad_idx=0, activation='relu', layer_norm_eps=1e-5):
+    print_logs=False, warmup_steps=4000, dropout=0.1, pad_idx=0, activation='relu', layer_norm_eps=1e-5):
         
         super().__init__()
-        self.save_hyperparameters(ignore=['warmup_steps'])
+        self.save_hyperparameters(ignore=['warmup_steps', 'print_logs'])
+        self.print_logs = print_logs
         self.warmup_steps = warmup_steps
 
         self.bert_lm = BertLM(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward,  num_layers=num_layers, vocab_size=vocab_size,
@@ -51,8 +52,11 @@ class Model(pl.LightningModule):
         _, _, V = out.shape
 
         loss: torch.Tensor = self.criterion(out.reshape(S*N, V), tgt.reshape(S*N))
+        loss_value: torch.Tensor = loss.detach()
 
-        self.log("loss", loss.detach(), batch_size=N)
+        if batch_idx % 100 and self.print_logs: print(f"epoch={self.current_epoch} | batch_idx={batch_idx} | loss={loss_value:.5f}")
+
+        self.log("loss", loss_value, batch_size=N)
         
         return loss
 
@@ -89,7 +93,7 @@ class Model(pl.LightningModule):
 
 
 def train(d_model: int, nhead: int, dim_feedforward: int, num_layers: int, epochs: int, batch_size: int, use_workers: bool, pin_memory: bool,
-data_dir: str, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2**23, warmup_steps=4000, **kwargs):
+data_dir: str, print_logs=False, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2**23, warmup_steps=4000, **kwargs):
 
     tokenizer: Tokenizer = Tokenizer.from_file(os.path.join(data_dir, 'vocab.json'))
     vocab_size: int = tokenizer.get_vocab_size()
@@ -99,7 +103,7 @@ data_dir: str, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2
     datamodule = DataModule(data_dir, os.path.join(data_dir, 'vocab.json'), batch_size=batch_size,
     use_workers=use_workers, pin_memory=pin_memory, chunk_size=chunk_size, use_tpu='tpu_cores' in kwargs.keys())
 
-    model = Model(d_model, nhead, dim_feedforward, num_layers, vocab_size, warmup_steps=warmup_steps, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps)
+    model = Model(d_model, nhead, dim_feedforward, num_layers, vocab_size, print_logs=print_logs, warmup_steps=warmup_steps, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps)
 
     trainer = pl.Trainer(max_epochs=epochs, **kwargs)
 
