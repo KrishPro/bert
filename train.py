@@ -93,6 +93,7 @@ data_dir: str, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2
     tokenizer: Tokenizer = Tokenizer.from_file(os.path.join(data_dir, 'vocab.json'))
     vocab_size: int = tokenizer.get_vocab_size()
     pad_idx = tokenizer.token_to_id("[PAD]")
+    del tokenizer
 
     datamodule = DataModule(data_dir, os.path.join(data_dir, 'vocab.json'), batch_size=batch_size,
     use_workers=use_workers, pin_memory=pin_memory, chunk_size=chunk_size, use_tpu='tpu_cores' in kwargs.keys())
