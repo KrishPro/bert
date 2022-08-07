@@ -26,12 +26,11 @@ except:
 
 class Model(pl.LightningModule):
     def __init__(self, d_model: int, nhead: int, dim_feedforward: int, num_layers: int, vocab_size: int,
-    print_logs=False, warmup_steps=4000, dropout=0.1, pad_idx=0, activation='relu', layer_norm_eps=1e-5):
+    print_logs=False, warmup_steps=4000, weight_decay=0.0, dropout=0.1, pad_idx=0, activation='relu', layer_norm_eps=1e-5):
         
         super().__init__()
-        self.save_hyperparameters(ignore=['warmup_steps', 'print_logs'])
+        self.save_hyperparameters(ignore=['print_logs'])
         self.print_logs = print_logs
-        self.warmup_steps = warmup_steps
 
         self.bert_lm = BertLM(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward,  num_layers=num_layers, vocab_size=vocab_size,
         dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps)
@@ -81,9 +80,9 @@ class Model(pl.LightningModule):
 
     def configure_optimizers(self):
         
-        get_lr = lambda step: (self.hparams['d_model'] ** -0.5) * min((step+1) ** -0.5, (step+1)*(self.warmup_steps**-1.5))
+        get_lr = lambda step: (self.hparams['d_model'] ** -0.5) * min((step+1) ** -0.5, (step+1)*(self.hparams['warmup_steps']**-1.5))
 
-        optimizer = optim.Adam(self.parameters(), lr=1)
+        optimizer = optim.Adam(self.parameters(), lr=1, weight_decay=self.hparams['weight_decay'])
 
         scheduler = optim.lr_scheduler.LambdaLR(optimizer, get_lr)
 
@@ -93,7 +92,7 @@ class Model(pl.LightningModule):
 
 
 def train(d_model: int, nhead: int, dim_feedforward: int, num_layers: int, epochs: int, batch_size: int, use_workers: bool, pin_memory: bool,
-data_dir: str, print_logs=False, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2**23, warmup_steps=4000, **kwargs):
+data_dir: str, print_logs=False, weight_decay=0.0, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2**23, warmup_steps=4000, **kwargs):
 
     tokenizer: Tokenizer = Tokenizer.from_file(os.path.join(data_dir, 'vocab.json'))
     vocab_size: int = tokenizer.get_vocab_size()
@@ -103,7 +102,7 @@ data_dir: str, print_logs=False, dropout=0.1, activation='relu', layer_norm_eps=
     datamodule = DataModule(data_dir, os.path.join(data_dir, 'vocab.json'), batch_size=batch_size,
     use_workers=use_workers, pin_memory=pin_memory, chunk_size=chunk_size, use_tpu='tpu_cores' in kwargs.keys())
 
-    model = Model(d_model, nhead, dim_feedforward, num_layers, vocab_size, print_logs=print_logs, warmup_steps=warmup_steps, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps)
+    model = Model(d_model, nhead, dim_feedforward, num_layers, vocab_size, print_logs=print_logs, warmup_steps=warmup_steps, weight_decay=weight_decay, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps)
 
     trainer = pl.Trainer(max_epochs=epochs, **kwargs)
 
