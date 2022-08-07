@@ -44,9 +44,10 @@ class Bert(nn.Module):
 
     @classmethod
     def from_checkpoint(cls, checkpoint_path: str):
+        known_hparams = cls.__init__.__code__.co_varnames
         ckpt = torch.load(checkpoint_path)
 
-        hparams = ckpt['hparams']
+        hparams = {k:v for k, v in ckpt['hparams'].items() if k in known_hparams}
         state_dict = ckpt['state_dict']
 
         model = cls(**hparams)
