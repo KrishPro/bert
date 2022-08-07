@@ -70,7 +70,7 @@ class Model(pl.LightningModule):
 
         loss: torch.Tensor = self.criterion(out.reshape(S*N, V), tgt.reshape(S*N))
 
-        self.log("val_loss", loss.detach(), batch_size=N)
+        self.log("val_loss", loss.detach(), batch_size=N, prog_bar=True)
         
         return loss
 
@@ -95,7 +95,7 @@ data_dir: str, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2
     pad_idx = tokenizer.token_to_id("[PAD]")
 
     datamodule = DataModule(data_dir, os.path.join(data_dir, 'vocab.json'), batch_size=batch_size,
-    use_workers=use_workers, pin_memory=pin_memory, chunk_size=chunk_size)
+    use_workers=use_workers, pin_memory=pin_memory, chunk_size=chunk_size, use_tpu='tpu_cores' in kwargs.keys())
 
     model = Model(d_model, nhead, dim_feedforward, num_layers, vocab_size, warmup_steps=warmup_steps, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps)
 
@@ -104,7 +104,7 @@ data_dir: str, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2
     trainer.fit(model, datamodule)
 
     ckpt_dir = os.path.join('lightning_logs', sorted(map(lambda name: (int(name.split('_')[1]), name), os.listdir('lightning_logs')))[-1][1], 'checkpoints')
-    if os.path.exists(ckpt_dir):
+    if os.path.exists(ckpt_dir) and os.listdir(ckpt_dir):
         ckpt_path = os.path.join(ckpt_dir, sorted(os.listdir(ckpt_dir))[-1])
 
         lightning_ckpt = torch.load(ckpt_path)
