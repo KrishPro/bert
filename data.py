@@ -9,9 +9,11 @@ from typing import List, Optional, Tuple
 import torch
 import pytorch_lightning as pl
 from torch.nn.utils.rnn import pad_sequence
+import torch_xla.core.xla_model as xm
 import torch.utils.data as data
 from tokenizers import Encoding, Tokenizer
 import os
+
 
 from tqdm import tqdm
 
@@ -115,8 +117,12 @@ class Dataset(data.Dataset):
     def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
         # If the requested idx is not in the currently loaded chunk then, Raise IndexError
         if not (self.chunk_start_idx <= idx < (self.chunk_start_idx + len(self.current_chunk))):
-            # Raise IndexError
-            raise IndexError('list index out of range')
+            
+            # If the requested idx is not from the currently loaded chunk, a random item is returned
+            idx = random.randint(self.chunk_start_idx, self.chunk_start_idx+len(self.current_chunk)-1)
+        
+            # # Raise IndexError
+            # raise IndexError('list index out of range')
   
         # If the requested idx is the last item of the current_chunk, load the next chunk
         if (idx - self.chunk_start_idx) == (len(self.current_chunk) - 1):
@@ -152,9 +158,10 @@ class Dataset(data.Dataset):
         
 
 class DataModule(pl.LightningDataModule):
-    def __init__(self, data_dir: str, vocab_path: str, batch_size: int, use_workers: bool, pin_memory: bool, chunk_size: int = 2 ** 23):
+    def __init__(self, data_dir: str, vocab_path: str, batch_size: int, use_workers: bool, pin_memory: bool, use_tpu: bool = False, chunk_size: int = 2 ** 23):
         super().__init__()
         # Storing the parameters we've got
+        self.use_tpu = use_tpu
         self.data_dir = data_dir
 
         self.dataset_kwargs = {'vocab_path': vocab_path, 'chunk_size': chunk_size}
@@ -190,11 +197,22 @@ class DataModule(pl.LightningDataModule):
         file.close()
 
     def train_dataloader(self) -> None:
+        # required for TPU support
+        sampler = None
+        if self.use_tpu:
+            sampler = data.DistributedSampler(self.train_dataset, num_replicas=xm.xrt_world_size(), rank=xm.get_ordinal(), shuffle=self._hparams['shuffle'])
+
         return data.DataLoader(self.train_dataset, batch_size=self._hparams['batch_size'], shuffle=self._hparams['shuffle'],
         pin_memory=self._hparams['pin_memory'], num_workers=os.cpu_count() if self._hparams['use_workers'] else 0, 
-        collate_fn=Dataset.collate_fn)
+        collate_fn=Dataset.collate_fn, sampler=sampler)
 
     def val_dataloader(self) -> None:
+        # required for TPU support
+        sampler = None
+        if self.use_tpu:
+            sampler = data.DistributedSampler(
+                self.val_dataset, num_replicas=xm.xrt_world_size(), rank=xm.get_ordinal(), shuffle=False
+            )
         return data.DataLoader(self.val_dataset, batch_size=self._hparams['batch_size'], shuffle=False,
         pin_memory=self._hparams['pin_memory'], num_workers=os.cpu_count() if self._hparams['use_workers'] else 0, 
-        collate_fn=Dataset.collate_fn)
+        collate_fn=Dataset.collate_fn, sampler=sampler)
