@@ -18,7 +18,7 @@ from tokenizers.processors import TemplateProcessing
 MAX_LEN = 256
 
 
-def create_vocab(data_path: str, vocab_path: str = "vocab.json"):
+def create_vocab(data_path: str, vocab_path: str = "./vocab.json"):
     """
     Reads the text file and creates a vocab out of it
     """
