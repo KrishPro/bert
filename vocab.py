@@ -44,10 +44,10 @@ def create_vocab(data_path: str, vocab_path: str = "./vocab.json"):
     tokenizer.enable_truncation(max_length=MAX_LEN)
 
     # Enabling padding
-    tokenizer.enable_padding(pad_id=tokenizer.token_to_id("[PAD]"), pad_token="[PAD]", length=MAX_LEN)
+    tokenizer.enable_padding(pad_id=tokenizer.token_to_id("[PAD]"), pad_token="[PAD]")
 
     # Saving the output
-    if not os.path.exists(os.path.dirname(vocab_path)): os.makedirs(os.path.dirname(vocab_path))
+    if not os.path.exists(os.path.dirname(vocab_path)) and os.path.dirname(vocab_path): os.makedirs(os.path.dirname(vocab_path))
     tokenizer.save(vocab_path)
 
 
