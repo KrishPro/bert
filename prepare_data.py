@@ -21,7 +21,10 @@ import nltk
 import os
 import re
 
-from vocab import create_vocab
+try:
+    from vocab import create_vocab
+except:
+    from pytorch_bert.vocab import create_vocab
 
 class ExtractEnglish:
     extract_word = lambda txt: re.sub(r'[\s0-9]', '', txt).translate(str.maketrans('', '', string.punctuation)).lower().strip()
