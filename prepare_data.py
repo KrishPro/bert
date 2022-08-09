@@ -120,12 +120,12 @@ class PrepareData:
 
 
     @staticmethod
-    def prepare(data_dir: str, output_path: str = None):
+    def prepare(data_dir: str, output_path: str = None, chunk_size = 100_000):
         tmp: List[str] = [str(time.time()) for _ in range(2)]
         if output_path: tmp[1] = output_path
 
         tmp[0] = PrepareData.merge_into_one(data_dir, tmp[0])
-        tmp[1] = PrepareData.prepare_file(tmp[0], tmp[1])
+        tmp[1] = PrepareData.prepare_file(tmp[0], tmp[1], chunk_size=chunk_size)
         os.remove(tmp[0])
         return tmp[1]
 
@@ -199,13 +199,13 @@ class ProcessData:
 
 
 
-def main(data_dir: str, output_path: str, vocab_path: str, save_disk=False):
-    raw_sentences = PrepareData.prepare(data_dir)
+def main(data_dir: str, output_path: str, vocab_path: str, chunk_size=100_000, save_disk=False):
+    raw_sentences = PrepareData.prepare(data_dir, chunk_size=chunk_size)
     if save_disk: shutil.rmtree(data_dir)
 
     create_vocab(raw_sentences, vocab_path)
 
-    data_processor = ProcessData(raw_sentences, output_path, vocab_path, chunk_size=100_000)
+    data_processor = ProcessData(raw_sentences, output_path, vocab_path, chunk_size=chunk_size)
 
     output_path = data_processor.process()
     os.remove(raw_sentences)
