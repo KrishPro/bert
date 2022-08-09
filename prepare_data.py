@@ -48,7 +48,7 @@ class PrepareData:
         output_file = open(output_path, 'w')
 
         # Looping over all the input_files
-        for fname in tqdm(os.listdir(data_dir)):
+        for fname in tqdm(os.listdir(data_dir), desc="Merging files"):
             fpath: str = os.path.join(data_dir, fname)
 
             # Reading the content of the input_file
@@ -102,7 +102,7 @@ class PrepareData:
         input_file, output_file = open(input_path, 'r'), open(output_path, 'w')
 
         chunk = []
-        for sentence in tqdm(input_file, total=orignal_num_sentences):
+        for sentence in tqdm(input_file, total=orignal_num_sentences, desc="Preparing data"):
 
             # Apending sentences into chunk till the chunk_size is reached
             chunk.append(sentence) 
@@ -182,7 +182,7 @@ class ProcessData:
         chunk = []
 
         with open(self.raw_sentences) as input_file, open(self.output_path, 'w') as output_file:
-            for sentence in tqdm(input_file, total=PrepareData._extract_num_sentences(self.raw_sentences)):
+            for sentence in tqdm(input_file, total=PrepareData._extract_num_sentences(self.raw_sentences), desc="Masking sentences"):
                 for _ in range(int(1/0.15)):
 
                     chunk.append(sentence.strip('\n'))
