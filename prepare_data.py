@@ -21,10 +21,9 @@ import nltk
 import os
 import re
 
-try:
-    from vocab import create_vocab
-except:
-    from pytorch_bert.vocab import create_vocab
+
+from vocab import create_vocab
+
 
 class ExtractEnglish:
     extract_word = lambda txt: re.sub(r'[\s0-9]', '', txt).translate(str.maketrans('', '', string.punctuation)).lower().strip()
@@ -123,13 +122,16 @@ class PrepareData:
 
 
     @staticmethod
-    def prepare(data_dir: str, output_path: str = None, chunk_size = 100_000):
+    def prepare(data_dir: str, output_path: str = None, save_disk=False, chunk_size = 100_000):
         tmp: List[str] = [str(time.time()) for _ in range(2)]
         if output_path: tmp[1] = output_path
 
         tmp[0] = PrepareData.merge_into_one(data_dir, tmp[0])
+        if save_disk: shutil.rmtree(data_dir)
+
         tmp[1] = PrepareData.prepare_file(tmp[0], tmp[1], chunk_size=chunk_size)
         os.remove(tmp[0])
+
         return tmp[1]
 
 
@@ -203,8 +205,7 @@ class ProcessData:
 
 
 def main(data_dir: str, output_path: str, vocab_path: str, chunk_size=100_000, save_disk=False):
-    raw_sentences = PrepareData.prepare(data_dir, chunk_size=chunk_size)
-    if save_disk: shutil.rmtree(data_dir)
+    raw_sentences = PrepareData.prepare(data_dir, save_disk=save_disk, chunk_size=chunk_size)
 
     create_vocab(raw_sentences, vocab_path)
 
@@ -216,13 +217,6 @@ def main(data_dir: str, output_path: str, vocab_path: str, chunk_size=100_000, s
     print()
     print(f"Output Path ==> {output_path}")
     print(f"Vocab Path  ==> {vocab_path}")
-
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
