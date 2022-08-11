@@ -22,7 +22,8 @@ import os
 import re
 
 
-from vocab import create_vocab
+try: from vocab import create_vocab
+except: from pytorch_bert.vocab import create_vocab
 
 
 class ExtractEnglish:
