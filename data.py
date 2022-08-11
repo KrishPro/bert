@@ -6,8 +6,10 @@ filename: `data.py`
 
 from torch.nn.utils.rnn import pad_sequence
 from typing import List, Tuple, Optional
-from prepare_data import PrepareData
 from tqdm import tqdm
+
+try: from prepare_data import PrepareData
+except ImportError: from pytorch_bert.prepare_data import PrepareData
 
 try: import torch_xla.core.xla_model as xm
 except: pass

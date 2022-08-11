@@ -13,7 +13,6 @@ import torch
 import torch.nn as nn
 from typing import Tuple
 import torch.optim as optim
-from tokenizers import Tokenizer
 import pytorch_lightning as pl
 
 try:
@@ -94,12 +93,9 @@ class Model(pl.LightningModule):
 def train(d_model: int, nhead: int, dim_feedforward: int, num_layers: int, epochs: int, batch_size: int, use_workers: bool, pin_memory: bool,
 data_dir: str, print_logs=False, weight_decay=0.0, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2**23, warmup_steps=4000, **kwargs):
 
-    tokenizer: Tokenizer = Tokenizer.from_file(os.path.join(data_dir, 'vocab.json'))
-    vocab_size: int = tokenizer.get_vocab_size()
-    pad_idx = tokenizer.token_to_id("[PAD]")
-    del tokenizer
+    vocab_size, pad_idx = 30_000, 0
 
-    datamodule = DataModule(data_dir, os.path.join(data_dir, 'vocab.json'), batch_size=batch_size,
+    datamodule = DataModule(data_dir, batch_size=batch_size,
     use_workers=use_workers, pin_memory=pin_memory, chunk_size=chunk_size, use_tpu='tpu_cores' in kwargs.keys())
 
     model = Model(d_model, nhead, dim_feedforward, num_layers, vocab_size, print_logs=print_logs, warmup_steps=warmup_steps, weight_decay=weight_decay, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps)
@@ -108,6 +104,7 @@ data_dir: str, print_logs=False, weight_decay=0.0, dropout=0.1, activation='relu
 
     trainer.fit(model, datamodule)
 
+    ## Processing the lightning logs to seprate the files required to re-create trainned model and the tensorboard logs
     version_dir = os.path.join('lightning_logs', sorted(map(lambda name: (int(name.split('_')[1]), name), os.listdir('lightning_logs')))[-1][1])
     ckpt_dir = os.path.join(version_dir, 'checkpoints')
     if os.path.exists(ckpt_dir) and os.listdir(ckpt_dir):
@@ -124,15 +121,16 @@ data_dir: str, print_logs=False, weight_decay=0.0, dropout=0.1, activation='relu
             with open(os.path.join(version_dir, 'hparams.yaml')) as file:
                 hparams = yaml.load(file, Loader=yaml.FullLoader)
 
+        # Saving the files required to re-create trainned model
         state_dict = {k[13:]: v for k, v in state_dict.items() if k.startswith('bert_lm.bert')}
         torch.save({'hparams': hparams, 'state_dict': state_dict}, 'output.ckpt')
 
+        # Deleting the ckpt_dir, to remove to un-processed copy of the files required to re-create trainned model
         shutil.rmtree(ckpt_dir)
     
         
 
 if __name__ == '__main__':
     
-    # The below example will raise error, as the data_dir doesn't exists
     train(d_model=64, nhead=8, dim_feedforward=256, num_layers=3, epochs=10, batch_size=32, use_workers=True, pin_memory=True,
-    data_dir='.ignore', dropout=0.1, activation='relu', limit_train_batches=5, limit_val_batches=2)
+    data_dir='.ignore/dataset', dropout=0.1, activation='relu', limit_train_batches=5, limit_val_batches=2)
