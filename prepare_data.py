@@ -14,7 +14,7 @@ import shutil
 from tokenizers import Tokenizer
 import time
 from typing import List, Tuple
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import string
 import emoji
 import nltk
@@ -203,22 +203,93 @@ class ProcessData:
         os.rename(self.output_path, PrepareData._embed_num_sentences(self.output_path, num_sentences))
         return PrepareData._embed_num_sentences(self.output_path, num_sentences)
 
+class SplitData:
+    def __init__(self, dataset_path: str, chunk_size: int, output_dir="dataset", val_ratio=0.01, save_disk=False, drop_last_chunk=False):
+        self.output_dir = output_dir
+        self.chunk_size = chunk_size
+        self.dataset = open(dataset_path)
+        self.val_ratio = val_ratio
+        self.save_disk = save_disk
+
+        try:
+            self.length = PrepareData._extract_num_sentences(dataset_path)
+        except:
+            self.dataset.seek(0)
+            self.length = 0
+            for _ in tqdm(self.dataset): self.length += 1
+            self.dataset.seek(0)
+
+        self.num_chunks = self.length / self.chunk_size
+        if self.num_chunks % 1 and not drop_last_chunk: self.num_chunks = int(self.num_chunks + 1)
+
+        if output_dir and not os.path.exists(output_dir): os.makedirs(output_dir)
+
+        self.prepare_chunks()
+
+        self.train_test_split()
+
+    def prepare_chunks(self):
+        self.dataset.seek(0)
+        for i_chunk in trange(self.num_chunks):
+            out_file_path = os.path.join(self.output_dir, f"{i_chunk}.txt")
+            num_sentences = 0
+
+            with open(out_file_path, 'w') as out_file:
+                for _ in range(self.chunk_size):
+                    try:
+                        s = next(self.dataset)
+                        out_file.write(s)
+                        num_sentences += 1
+
+                    except StopIteration:
+                        break
+
+            os.rename(out_file_path, PrepareData._embed_num_sentences(out_file_path, num_sentences))
+        
+        self.dataset.close()
+
+        if self.save_disk:
+            os.remove(self.dataset.name)
+        
+        del self.dataset
+
+    def train_test_split(self):
+        train_dir, test_dir = os.path.join(self.output_dir, "train"), os.path.join(self.output_dir, "test")
+        
+        if not os.path.exists(train_dir): os.makedirs(train_dir)
+        if not os.path.exists(test_dir): os.makedirs(test_dir)
+
+        num_test_chunks = self.num_chunks * self.val_ratio
+        if num_test_chunks % 1: num_test_chunks += 1
+
+        chunks = [f for f in os.listdir(self.output_dir) if os.path.isfile(f)]
+
+        test_chunks = chunks[:num_test_chunks]
+        train_chunks = chunks[num_test_chunks:]
+
+        for t_chunk in tqdm(train_chunks, desc="Separating training chunks"):
+            os.rename(os.path.join(self.output_dir, t_chunk), os.path.join(self.output_dir, "train", t_chunk))
+        
+        for t_chunk in tqdm(test_chunks, desc="Separating testing chunks"):
+            os.rename(os.path.join(self.output_dir, t_chunk), os.path.join(self.output_dir, "test", t_chunk))
 
 
-def main(data_dir: str, output_path: str, vocab_path: str, chunk_size=100_000, save_disk=False):
-    raw_sentences = PrepareData.prepare(data_dir, save_disk=save_disk, chunk_size=chunk_size)
+def main(data_dir: str, output_dir: str, vocab_path: str, val_ratio=0.01, mem_chunk_size=100_000, disk_chunk_size=1_000_000, save_disk=False):
+    raw_sentences = PrepareData.prepare(data_dir, save_disk=save_disk, chunk_size=mem_chunk_size)
 
     create_vocab(raw_sentences, vocab_path)
 
-    data_processor = ProcessData(raw_sentences, output_path, vocab_path, chunk_size=chunk_size)
+    data_processor = ProcessData(raw_sentences, os.path.join(output_dir, 'dataset.txt'), vocab_path, chunk_size=mem_chunk_size)
 
     output_path = data_processor.process()
     os.remove(raw_sentences)
 
+    SplitData(output_path, chunk_size=1_000_000, output_dir=output_dir, val_ratio=val_ratio, save_disk=save_disk, drop_last_chunk=False)
+
     print()
-    print(f"Output Path ==> {output_path}")
+    print(f"Output Path ==> {output_dir}")
     print(f"Vocab Path  ==> {vocab_path}")
 
 
 if __name__ == '__main__':
-    main('.ignore/books1/epubtxt', 'dataset.txt', 'vocab.json')
+    main('.ignore/books1/epubtxt', 'dataset', 'vocab.json')
