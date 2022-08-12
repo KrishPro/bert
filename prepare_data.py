@@ -274,6 +274,20 @@ class SplitData:
             os.rename(os.path.join(self.output_dir, t_chunk), os.path.join(self.output_dir, "test", t_chunk))
 
 
+def shuffle_each_file(dataset_dir: str):
+    for root, _, files in os.walk(dataset_dir):
+        if files:
+            for f in tqdm(files, desc=root):
+                file_path = os.path.join(root, f)
+                with open(file_path) as file:
+                    content = file.read()
+                    content = content.strip().strip("\n").split('\n')
+                    random.shuffle(content)
+                with open(file_path, 'w') as file:
+                    file.write('\n'.join(content))
+
+
+
 def main(data_dir: str, output_dir: str, vocab_path: str, val_ratio=0.01, mem_chunk_size=100_000, disk_chunk_size=1_000_000, save_disk=False):
     raw_sentences = PrepareData.prepare(data_dir, save_disk=save_disk, chunk_size=mem_chunk_size)
 
