@@ -91,12 +91,12 @@ class Model(pl.LightningModule):
 
 
 def train(d_model: int, nhead: int, dim_feedforward: int, num_layers: int, epochs: int, batch_size: int, use_workers: bool, pin_memory: bool,
-data_dir: str, print_logs=False, weight_decay=0.0, dropout=0.1, activation='relu', layer_norm_eps=1e-5, chunk_size=2**23, warmup_steps=4000, **kwargs):
+data_dir: str, print_logs=False, weight_decay=0.0, dropout=0.1, activation='relu', layer_norm_eps=1e-5, warmup_steps=4000, **kwargs):
 
     vocab_size, pad_idx = 30_000, 0
 
     datamodule = DataModule(data_dir, batch_size=batch_size,
-    use_workers=use_workers, pin_memory=pin_memory, chunk_size=chunk_size, use_tpu='tpu_cores' in kwargs.keys())
+    use_workers=use_workers, pin_memory=pin_memory, use_tpu='tpu_cores' in kwargs.keys())
 
     model = Model(d_model, nhead, dim_feedforward, num_layers, vocab_size, print_logs=print_logs, warmup_steps=warmup_steps, weight_decay=weight_decay, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps)
 
