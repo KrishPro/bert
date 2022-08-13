@@ -6,7 +6,6 @@ filename: `data.py`
 
 from torch.nn.utils.rnn import pad_sequence
 from typing import List, Tuple, Optional
-from tqdm import tqdm
 
 try: from prepare_data import PrepareData
 except ImportError: from pytorch_bert.prepare_data import PrepareData
@@ -20,71 +19,35 @@ import torch
 import os
 
 class Dataset(data.Dataset):
-    def __init__(self, data_path: str, chunk_size: int = 2 ** 23):
-        self.chunk_size = chunk_size
-        self.file = open(data_path)
+    def __init__(self, data_dir: str):
+        self.chunks = [os.path.join(data_dir, chunk) for chunk in os.listdir(data_dir)]
 
-        try:
-            self.length = PrepareData._extract_num_sentences(data_path)
-        except:
-            self.length = 0
-            self.file.seek(0)
-            for _ in self.file: self.length += 1
-            self.file.seek(0)
+        self.length = sum(map(PrepareData._extract_num_sentences, self.chunks))
 
         self._reset()
 
-    def _load_chunk(self):
-        if not hasattr(self, 'previous_left'): self.previous_left = ''
-       
-        chunk = (self.previous_left + self.file.read(self.chunk_size))
-    
-        last_new_line_char = chunk.rfind('\n')
+    def _load_chunk(self, idx: int = None):
+        if idx is None and hasattr(self, 'current_chunk_path'):
+            idx = self.chunks.index(self.current_chunk_path) + 1
 
-        if last_new_line_char >= 0:
-            self.previous_left = chunk[last_new_line_char+1:]
-            chunk = chunk[:last_new_line_char]
-            if not chunk:
-                chunk = self.previous_left
-                self.previous_left = ''
-        else:
-            self.previous_left = ''
+        if idx is None:
+            print("Neither current_chunk_path nor idx was given, So setting idx to 0")
+            idx = 0
 
-        chunk = chunk.splitlines()
-
-        try:
-            chunk = list( map( lambda line: tuple(map(lambda s: list(map(int, s.strip().split(' '))), line.strip().split('\t'))), filter(lambda c: c and len(c.split('\t')) == 2, chunk) )) 
-        except:
-            try:
-                final_chunk = []
-                for c in chunk:
-                    ss = c.strip().split('\t')
-                    final_c = []
-                    if len(ss) == 2:
-                        for s in ss:
-                            final_s = []
-                            for i in s.strip().split(' '):
-                                try:
-                                    final_s.append(int(i))
-                                except:
-                                    print(i)
-                            final_c.append(final_s)
-                 
-                        final_chunk.append(tuple(final_c))
-                chunk = final_chunk
-                del final_chunk, final_c, final_s, ss, c
-            except:
-                print("[WARN]: A chunk failed to load and is skipped. So, the dataset will have unexpectedly shorter length")
-                chunk = self._load_chunk()
+        if -len(self.chunks) > idx or idx >= len(self.chunks):
+            return None
+   
+        self.current_chunk_path = self.chunks[idx]
+     
+        with open(self.current_chunk_path) as file:
+            chunk = file.read().split("\n")
 
         return chunk
 
     def _reset(self):
         self.current_chunk_start = 0
-        self.previous_left = ''
-        self.file.seek(0)
 
-        self.current_chunk = self._load_chunk()
+        self.current_chunk = self._load_chunk(idx=0)
 
         self.current_chunk_end = len(self.current_chunk) - 1
 
@@ -102,14 +65,19 @@ class Dataset(data.Dataset):
             self._reset()
             raise StopIteration
 
-    
+    @staticmethod
+    def _parse_sentence(sentence: str):
+        return list(map(int, sentence.split(' ')))
+
     def __getitem__(self, idx):
-        if idx == (self.current_chunk_end + 1):
+        if idx > self.current_chunk_end:
             self.load_chunk()
 
         assert self.current_chunk_start <= idx <= self.current_chunk_end, f"Index Error, Sampled out of chunk"
 
-        src, tgt = self.current_chunk[idx - self.current_chunk_start]
+        item = self.current_chunk[idx - self.current_chunk_start]
+
+        src, tgt = map(self._parse_sentence, item.split('\t'))
 
         return torch.tensor(src), torch.tensor(tgt)
     
@@ -128,42 +96,22 @@ class Dataset(data.Dataset):
 
 
 class DataModule(pl.LightningDataModule):
-    def __init__(self, data_dir: str, batch_size: int, use_workers: bool, pin_memory: bool, use_tpu: bool = False, chunk_size: int = 2 ** 23):
+    def __init__(self, data_dir: str, batch_size: int, use_workers: bool = False, pin_memory: bool = False, use_tpu: bool = False):
         super().__init__()
         # Storing the parameters we've got
         self.use_tpu = use_tpu
         self.data_dir = data_dir
 
-        self.dataset_kwargs = {'chunk_size': chunk_size}
         self._hparams = {'batch_size': batch_size, 'use_workers': use_workers, 'pin_memory': pin_memory, 'shuffle': False}
 
     def setup(self, stage: Optional[str] = None) -> None:
          # Assign train/val datasets for use in dataloaders
         if stage == "fit" or stage is None:
 
-            test_path, train_path = [os.path.join(self.data_dir, path) for path in sorted(os.listdir(self.data_dir)) if path.startswith('train') or path.startswith('test')]
+            test_path, train_path = os.path.join(self.data_dir, 'test'), os.path.join(self.data_dir, 'train')
 
-            self.train_dataset = Dataset(train_path, **self.dataset_kwargs)
-            self.val_dataset = Dataset(test_path, **self.dataset_kwargs)
-
-    @staticmethod
-    def train_test_split(input_path: str, output_dir: str, val_ratio: float = 0.01):
-        """
-        This function will perform a train-test split
-        """
-        num_sentences = PrepareData._extract_num_sentences(input_path)
-        val_size = int(num_sentences * val_ratio)
-        
-        with open(input_path) as file:
-
-            train_file_path, test_file_path = os.path.join(output_dir, f'train-{num_sentences-val_size}.txt'), os.path.join(output_dir, f'test-{val_size}.txt')
-
-            with open(train_file_path, 'w') as train_file, open(test_file_path, 'w') as test_file:
-                for i, sentence in enumerate(tqdm(file, total=num_sentences)):
-                    if i < val_size:
-                        test_file.write(sentence)
-                    else:
-                        train_file.write(sentence)
+            self.train_dataset = Dataset(train_path)
+            self.val_dataset = Dataset(test_path)
 
     def train_dataloader(self) -> None:
         # required for TPU support
