@@ -10,7 +10,8 @@ from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.processors import TemplateProcessing
-from utils import ensure_parent_dir
+try: from utils import ensure_parent_dir
+except: from bert.utils import ensure_parent_dir
 
 ## IF YOU CHANGE THIS YOU MUST RE-CREATE ALL THE VOCAB FILES
 ## AS THIS VARIABLE AFFECTS ALL THOSE FILES

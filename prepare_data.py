@@ -14,7 +14,8 @@ import emoji
 import nltk
 import re
 
-from utils import embed_num_sentences_into_file, ensure_dir, ensure_parent_dir, extract_num_sentences
+try: from utils import embed_num_sentences_into_file, ensure_dir, ensure_parent_dir, extract_num_sentences
+except: from bert.utils import embed_num_sentences_into_file, ensure_dir, ensure_parent_dir, extract_num_sentences
 
 
 class ExtractEnglish:

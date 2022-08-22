@@ -12,7 +12,9 @@ from tokenizers import Tokenizer, Encoding
 from pytorch_lightning import LightningDataModule
 from torch.nn.utils.rnn import pad_sequence
 from typing import Optional, Tuple, List
-from utils import extract_num_sentences
+
+try: from utils import extract_num_sentences
+except: from bert.utils import extract_num_sentences
 
 try: import torch_xla.core.xla_model as xm
 except: pass
