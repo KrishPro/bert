@@ -4,13 +4,18 @@ Written by KrishPro @ KP
 filename: `data.py`
 """
 
+import os
 import torch
 import random
 import torch.utils.data as data
 from tokenizers import Tokenizer, Encoding
+from pytorch_lightning import LightningDataModule
 from torch.nn.utils.rnn import pad_sequence
-from typing import Tuple, List
+from typing import Optional, Tuple, List
 from utils import extract_num_sentences
+
+try: import torch_xla.core.xla_model as xm
+except: pass
 
 class Dataset(data.Dataset):
     def __init__(self, data_path: str, vocab_path: str, chunk_size = 2**23) -> None:
@@ -120,3 +125,37 @@ class Dataset(data.Dataset):
 
     def __len__(self) -> int:
         return self.length
+
+class DataModule(LightningDataModule):
+    def __init__(self, data_dir: str, batch_size: int, shuffle=False, pin_memory=False, use_workers=False, use_tpu=False) -> None:
+        super().__init__()
+
+        self.dataloader_kwargs = {'batch_size': batch_size, 'shuffle': shuffle, 'pin_memory': pin_memory, 'num_workers': os.cpu_count() if use_workers else 0}
+        self.sampler_kwargs = {'shuffle': shuffle}
+
+        self.use_tpu = use_tpu
+        self.data_dir = data_dir
+
+    def setup(self, stage: Optional[str] = None):
+        if stage == "fit" or stage == None:
+            test, train = sorted([os.path.join(self.data_dir, p) for p in os.listdir(self.data_dir) if p.startswith("train") or p.startswith("test")])
+            
+            self.train_dataset = Dataset(train, os.path.join(self.data_dir, "vocab.json"))
+            self.val_dataset = Dataset(test, os.path.join(self.data_dir, "vocab.json"))
+
+        
+    def train_dataloader(self):
+        sampler = None
+        
+        if self.use_tpu:
+            sampler = data.DistributedSampler(self.train_dataset, num_replicas=xm.xrt_world_size(), rank=xm.get_ordinal(), **self.sampler_kwargs)
+
+        return data.DataLoader(self.train_dataset, sampler=sampler, collate_fn=Dataset.collate_fn, **self.dataloader_kwargs)
+    
+    def val_dataloader(self):
+        sampler = None
+        
+        if self.use_tpu:
+            sampler = data.DistributedSampler(self.val_dataset, num_replicas=xm.xrt_world_size(), rank=xm.get_ordinal(), **self.sampler_kwargs)
+
+        return data.DataLoader(self.val_dataset, sampler=sampler, collate_fn=Dataset.collate_fn, **self.dataloader_kwargs)
