@@ -18,11 +18,11 @@ import torch
 
 class Model(LightningModule):
     def __init__(self, d_model:int, nhead:int, dim_feedforward:int, num_layers:int, weight_decay=0.0, warmup_steps=4_000,
-    vocab_size=30_000, dropout=0.1, pad_idx=0, activation="gelu", layer_norm_eps=1e-5) -> None:
+    vocab_size=30_000, dropout=0.1, pad_idx=0, activation="gelu", layer_norm_eps=1e-5, print_logs=False) -> None:
 
         super().__init__()
-        self.save_hyperparameters()
-
+        self.save_hyperparameters(ignore=["print_logs"])
+        self.print_logs = print_logs
 
         self.bert_lm = BertLM(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=num_layers, vocab_size=vocab_size,
         dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps)
@@ -38,7 +38,11 @@ class Model(LightningModule):
         # out.shape = (S, N, V)
         V = out.size(2)
 
-        loss = self.criterion(out.view(S*N, V), tgt.view(S*N))
+        loss: torch.Tensor = self.criterion(out.view(S*N, V), tgt.view(S*N))
+
+        if self.print_logs: print(f"epoch={self.current_epoch} | batch_idx={batch_idx} | loss={loss.detach():.3f}")
+
+        self.log("loss", loss.detach(), batch_size=N)
 
         return loss
 
@@ -51,7 +55,9 @@ class Model(LightningModule):
         # out.shape = (S, N, V)
         V = out.size(2)
 
-        loss = self.criterion(out.reshape((S*N, V)), tgt.reshape((S*N)))
+        loss: torch.Tensor = self.criterion(out.reshape((S*N, V)), tgt.reshape((S*N)))
+
+        self.log("val_loss", loss.detach(), batch_size=N, prog_bar=True)
 
         return loss
 
@@ -67,14 +73,14 @@ class Model(LightningModule):
 
         return [optimizer], [scheduler]
 
-def train(d_model:int, nhead:int, dim_feedforward:int, num_layers:int, data_dir:str, batch_size:int, weight_decay=0.0, warmup_steps=4_000,
+def train(d_model:int, nhead:int, dim_feedforward:int, num_layers:int, data_dir:str, batch_size:int, weight_decay=0.0, warmup_steps=4_000, print_logs=False,
 vocab_size=30_000, dropout=0.1, pad_idx=0, activation="gelu", shuffle=False, pin_memory=False, use_workers=False, layer_norm_eps=1e-5, **kwargs):
 
     use_tpu = kwargs.get("accelerator") == "tpu"
 
     datamodule = DataModule(data_dir=data_dir, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, use_workers=use_workers, use_tpu=use_tpu)
 
-    model = Model(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=num_layers, weight_decay=weight_decay,
+    model = Model(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=num_layers, weight_decay=weight_decay, print_logs=print_logs,
     vocab_size=vocab_size, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps, warmup_steps=warmup_steps)
 
     trainer = Trainer(**kwargs)
