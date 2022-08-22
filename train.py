@@ -6,8 +6,12 @@ filename: `train.py`
 
 from typing import Tuple
 from pytorch_lightning import LightningModule, Trainer
-from model import BertLM
-from data import DataModule
+try:
+    from model import BertLM
+    from data import DataModule
+except:
+    from bert.model import BertLM
+    from bert.data import DataModule
 import torch.optim as optim
 import torch.nn as nn
 import torch
