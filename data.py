@@ -25,8 +25,7 @@ class Dataset(data.Dataset):
 
         self.tokenizer: Tokenizer = Tokenizer.from_file(vocab_path)
 
-        self.sos_token, self.eos_token, self.mask_token, self.pad_token, self.vocab_size = self.tokenizer.token_to_id("[SOS]"), self.tokenizer.token_to_id("[EOS]"),
-        self.tokenizer.token_to_id("[MASK]"), self.tokenizer.token_to_id("[PAD]"), self.tokenizer.get_vocab_size()
+        self.sos_token, self.eos_token, self.mask_token, self.pad_token, self.vocab_size = self.tokenizer.token_to_id("[SOS]"), self.tokenizer.token_to_id("[EOS]"), self.tokenizer.token_to_id("[MASK]"), self.tokenizer.token_to_id("[PAD]"), self.tokenizer.get_vocab_size()
 
         self.length = extract_num_sentences(data_path)
         self.data_file = open(data_path)
