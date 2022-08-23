@@ -24,6 +24,10 @@ class Dataset(data.Dataset):
         super().__init__()
 
         self.tokenizer: Tokenizer = Tokenizer.from_file(vocab_path)
+
+        self.sos_token, self.eos_token, self.mask_token, self.pad_token, self.vocab_size = self.tokenizer.token_to_id("[SOS]"), self.tokenizer.token_to_id("[EOS]"),
+        self.tokenizer.token_to_id("[MASK]"), self.tokenizer.token_to_id("[PAD]"), self.tokenizer.get_vocab_size()
+
         self.length = extract_num_sentences(data_path)
         self.data_file = open(data_path)
         self.chunk_size = chunk_size
@@ -62,9 +66,7 @@ class Dataset(data.Dataset):
         self.current_chunk_end += len(self.current_chunk)
 
 
-    def mask(self, encoding: Encoding) -> Tuple[List[int], List[int]]:
-        # Extracting ids
-        ids: List[int] = encoding.ids
+    def mask(self, ids: List[int]) -> Tuple[List[int], List[int]]:
 
         # Creating blank lists
         src, tgt = list(), list()
@@ -75,16 +77,16 @@ class Dataset(data.Dataset):
             prob = random.random()
 
             # Masking 15% of tokens
-            if prob < 0.15 and (id != self.tokenizer.token_to_id("[SOS]") and id != self.tokenizer.token_to_id("[EOS]")):
+            if prob < 0.15 and (id != self.sos_token and id != self.eos_token):
                 prob /= 0.15
 
                 # Replacing 80% tokens with [MASK] token
                 if prob < 0.8:
-                    src.append(self.tokenizer.token_to_id("[MASK]"))
+                    src.append(self.mask_token)
 
                 # Replacing 10% tokens with random token
                 elif prob < 0.9:
-                    src.append(random.randrange(self.tokenizer.get_vocab_size()))
+                    src.append(random.randrange(self.vocab_size))
                 # Leaving 10% tokens un-changed
                 else:
                     src.append(id)
@@ -95,7 +97,7 @@ class Dataset(data.Dataset):
             else:
                 # If the token is decided to be un-masked, the actual token and pad_id are appended to src and tgt respectively.
                 src.append(id)
-                tgt.append(self.tokenizer.padding['pad_id'])
+                tgt.append(self.pad_token)
 
         return src, tgt
 
@@ -107,10 +109,10 @@ class Dataset(data.Dataset):
         sentence = self.current_chunk[idx - self.current_chunk_start]
 
         # Tokenizing the sentence
-        encoding: Encoding = self.tokenizer.encode(sentence)
+        ids: List[int] = self.tokenizer.encode(sentence).ids
 
         # Masking random tokens
-        src, tgt = self.mask(encoding)
+        src, tgt = self.mask(ids)
 
         # Converting src & tgt to tensors before returning
         return torch.tensor(src), torch.tensor(tgt)
