@@ -65,7 +65,7 @@ class Model(LightningModule):
         
         get_lr = lambda step: (self.hparams['d_model'] ** -0.5) * min((step+1) ** -0.5, (step+1)*(self.hparams['warmup_steps']**-1.5))
 
-        optimizer = optim.Adam(self.parameters(), lr=self.hparams['base_lr'], weight_decay=self.hparams['weight_decay'])
+        optimizer = optim.Adam(self.parameters(), lr=self.hparams['base_lr'], weight_decay=self.hparams['weight_decay'], betas=(0.9, 0.98))
 
         scheduler = optim.lr_scheduler.LambdaLR(optimizer, get_lr)
 
