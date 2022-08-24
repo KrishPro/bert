@@ -18,7 +18,7 @@ import torch
 
 class Model(LightningModule):
     def __init__(self, d_model:int, nhead:int, dim_feedforward:int, num_layers:int, weight_decay=0.0, warmup_steps=4_000,
-    vocab_size=30_000, dropout=0.1, pad_idx=0, activation="gelu", layer_norm_eps=1e-5, print_logs=False) -> None:
+    base_lr=1, vocab_size=30_000, dropout=0.1, pad_idx=0, activation="gelu", layer_norm_eps=1e-5, print_logs=False) -> None:
 
         super().__init__()
         self.save_hyperparameters(ignore=["print_logs"])
@@ -65,7 +65,7 @@ class Model(LightningModule):
         
         get_lr = lambda step: (self.hparams['d_model'] ** -0.5) * min((step+1) ** -0.5, (step+1)*(self.hparams['warmup_steps']**-1.5))
 
-        optimizer = optim.Adam(self.parameters(), lr=1, weight_decay=self.hparams['weight_decay'])
+        optimizer = optim.Adam(self.parameters(), lr=self.hparams['base_lr'], weight_decay=self.hparams['weight_decay'])
 
         scheduler = optim.lr_scheduler.LambdaLR(optimizer, get_lr)
 
@@ -74,14 +74,14 @@ class Model(LightningModule):
         return [optimizer], [scheduler]
 
 def train(d_model:int, nhead:int, dim_feedforward:int, num_layers:int, data_dir:str, batch_size:int, weight_decay=0.0, warmup_steps=4_000, print_logs=False,
-vocab_size=30_000, dropout=0.1, pad_idx=0, activation="gelu", shuffle=False, pin_memory=False, use_workers=False, layer_norm_eps=1e-5, **kwargs):
+base_lr=1, vocab_size=30_000, dropout=0.1, pad_idx=0, activation="gelu", shuffle=False, pin_memory=False, use_workers=False, layer_norm_eps=1e-5, **kwargs):
 
     use_tpu = kwargs.get("accelerator") == "tpu"
 
     datamodule = DataModule(data_dir=data_dir, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, use_workers=use_workers, use_tpu=use_tpu)
 
     model = Model(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, num_layers=num_layers, weight_decay=weight_decay, print_logs=print_logs,
-    vocab_size=vocab_size, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps, warmup_steps=warmup_steps)
+    vocab_size=vocab_size, dropout=dropout, pad_idx=pad_idx, activation=activation, layer_norm_eps=layer_norm_eps, warmup_steps=warmup_steps, base_lr=base_lr)
 
     trainer = Trainer(**kwargs)
 
